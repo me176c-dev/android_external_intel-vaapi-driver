@@ -1019,6 +1019,20 @@ i965_get_rc_attributes(VADriverContextP ctx, VAProfile profile, VAEntrypoint ent
     return rc_attribs;
 }
 
+static inline void
+max_resolution(struct i965_driver_data *i965,
+               struct object_config *obj_config,
+               int *w,                                  /* out */
+               int *h)                                  /* out */
+{
+    if (i965->codec_info->max_resolution) {
+        i965->codec_info->max_resolution(i965, obj_config, w, h);
+    } else {
+        *w = i965->codec_info->max_width;
+        *h = i965->codec_info->max_height;
+    }
+}
+
 static uint32_t
 i965_get_enc_packed_attributes(VADriverContextP ctx, VAProfile profile, VAEntrypoint entrypoint)
 {
@@ -1303,6 +1317,25 @@ i965_GetConfigAttributes(VADriverContextP ctx,
                 (configVal->bits).interlaced = STATS_INTERLACED_SUPPORT;
             }
             break;
+
+        case VAConfigAttribMaxPictureWidth:
+        case VAConfigAttribMaxPictureHeight: {
+            struct object_config config;
+            int max_width, max_height;
+
+            memset(&config, 0, sizeof(config));
+            config.profile = profile;
+            config.entrypoint = entrypoint;
+            config.wrapper_config = VA_INVALID_ID;
+
+            max_resolution(i965, &config, &max_width, &max_height);
+            if (attrib_list[i].type == VAConfigAttribMaxPictureWidth) {
+                attrib_list[i].value = max_width;
+            } else {
+                attrib_list[i].value = max_height;
+            }
+        }
+        break;
 
         default:
             /* Do nothing */
@@ -2528,20 +2561,6 @@ i965_destroy_context(struct object_heap *heap, struct object_base *obj)
 
     free(obj_context->render_targets);
     object_heap_free(heap, obj);
-}
-
-static inline void
-max_resolution(struct i965_driver_data *i965,
-               struct object_config *obj_config,
-               int *w,                                  /* out */
-               int *h)                                  /* out */
-{
-    if (i965->codec_info->max_resolution) {
-        i965->codec_info->max_resolution(i965, obj_config, w, h);
-    } else {
-        *w = i965->codec_info->max_width;
-        *h = i965->codec_info->max_height;
-    }
 }
 
 VAStatus
